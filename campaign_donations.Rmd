@@ -1,0 +1,73 @@
+---
+title: "Harvard Affiliate Campaign Donations"
+author: "Simone Chu"
+date: "4/10/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readxl)
+library(stringr)
+library(knitr)
+library(gt)
+library(fs)
+library(lubridate)
+library(ggthemes)
+library(tidyverse)
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+
+dl_weball06 <- download.file("https://www.fec.gov/files/bulk-downloads/2006/weball06.zip", "dl_weball06.zip")
+
+weball06 <- read_delim("dl_weball06.zip", "|")
+
+colnames(weball06) <- c("cand_id", "cand_name", "cand_ici", "pty_cd", "party", "ttl_receipts", "trans_from_auth", "ttl_disb", "trans_to_auth", "coh_bop", "cash", "cand_contrib", "cand_loans", "other_loans", "cand_loan_repay", "other_loan_repay", "debts_owed_by", "ttl_indiv_contrib", "cand_state", "cand_office_district", "spec_election", "prim_election", "run_election", "gen_election", "gen_election_percent", "other_pol_cmte_contrib", "pol_pty_contrib", "cvg_end_dt", "indiv_refunds", "cmte_refunds")
+
+download.file("https://www.fec.gov/files/bulk-downloads/2006/indiv06.zip",
+              "indiv06.zip",
+              mode = "wb")
+
+indiv06 <- read_delim("indiv06.zip", "|", escape_double=TRUE, guess_max=10000) %>%
+  select(1, 8, 12, 13, 14, 15)
+colnames(indiv06) <- c("cmte_id", "contributor_name", "employer", "occupation", "date", "amount")
+
+dl_cm06 <- download.file("https://www.fec.gov/files/bulk-downloads/2006/cm06.zip", 
+                         "cm06.zip", 
+                         mode = "wb")
+
+cm06 <- read_delim("cm06.zip", "|") %>%
+  select(1, 11, 15)
+  
+colnames(cm06) <- c("cmte_id", "cmte_party", "cand_id")
+
+for_q4_pt1 <- left_join(cm06, weball06, by = "cand_id")
+
+for_q4 <- left_join(indiv06, for_q4_pt1, by = "cmte_id")
+
+fs::file_delete(c("indiv06.zip", "dl_weball06.zip", "cm06.zip"))
+
+```
+```{r, echo=FALSE, warning=FALSE, message=FALSE, cache=TRUE}
+
+party_colors <- c("#2E74C0", "gray50", "#CB454A")
+
+for_q4 %>%
+  filter(employer == "HARVARD UNIVERSITY") %>%
+  select(party, date, amount) %>%
+  filter(amount > 0) %>%
+  mutate(date = as.Date(date, format = "%m%d%Y")) %>%
+  group_by(date, party) %>%
+  ggplot(mapping = aes(x = date, y = amount, color = party, alpha = 0.5)) +
+  geom_point(position = "jitter") + 
+  xlab("Date") + 
+  ylab("Amount Donated, in USD") +
+  labs(title = "Amount Harvard University Affiliates Donated, \nby Party") + 
+  guides(alpha = FALSE, 
+         color = guide_legend(title = "Party")) +
+  theme_fivethirtyeight() 
+  
+```
+
